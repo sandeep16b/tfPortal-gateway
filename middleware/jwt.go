@@ -32,16 +32,14 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewDecoder(r.Body).Decode(&creds)
 
 	if creds.Username != "admin" || creds.Password != "password123" {
-		http.Error(w, "http.nothing", http.StatusUnauthorized)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
 	expirationTime := time.Now().Add(30 * time.Minute)
-	claims := &Claims{
-		Username: creds.Username,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(expirationTime),
-		},
+	claims := jwt.MapClaims{
+		"username": creds.Username,
+		"exp": expirationTime.Unix(), // ✅ CORRECT — seconds, NOT UnixMilli()
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
