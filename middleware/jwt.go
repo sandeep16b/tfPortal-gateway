@@ -26,29 +26,47 @@ type Claims struct {
 
 // LoginHandler handles user login and token creation
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("login handler")
+	fmt.Println("🔐 login handler hit")
 
+	// Decode credentials
 	var creds Credentials
-	_ = json.NewDecoder(r.Body).Decode(&creds)
-
-	if creds.Username != "admin" || creds.Password != "password123" {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+	if err := json.NewDecoder(r.Body).Decode(&creds); err != nil {
+		fmt.Println("❌ JSON decode error:", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid request body"})
 		return
 	}
 
-	expirationTime := time.Now().Add(30 * time.Minute)
-	claims := jwt.MapClaims{
-		"username": creds.Username,
-		"exp": expirationTime.Unix(), // ✅ CORRECT — seconds, NOT UnixMilli()
+	// Check credentials
+	if creds.Username != "admin" || creds.Password != "password123" {
+		fmt.Println("❌ Invalid credentials")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid username or password"})
+		return
+	}
+
+	// Generate token
+	claims := Claims{
+		Username: creds.Username,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(10 * time.Second)),
+		},
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err := token.SignedString(jwtKey)
 	if err != nil {
-		http.Error(w, "Token generation failed", http.StatusInternalServerError)
+		fmt.Println("❌ Token generation error:", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Token generation failed"})
 		return
 	}
 
+	// ✅ Return token
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"token": tokenString})
 }
 
